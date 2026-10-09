@@ -12,9 +12,8 @@ the file. Your actual data is not changed.
 
 ## Installation
 
-The tool has no dependencies outside the Python standard library and needs
-Python 3.10 or newer. [uv](https://docs.astral.sh/uv/) is the recommended way
-to install it:
+The tool needs Python 3.10 or newer. [uv](https://docs.astral.sh/uv/) is the
+recommended way to install it:
 
 ```sh
 # from a local checkout
@@ -34,12 +33,42 @@ mowl-to-garmin ride.fit                  # -> ride_garmin.fit
 mowl-to-garmin folder/                   # every .fit in the folder
 mowl-to-garmin a.fit b.fit c.fit
 mowl-to-garmin ride.fit --product edge530
-mowl-to-garmin ride.fit --product 3121   # any numeric Garmin product id
+mowl-to-garmin ride.fit -p 3121          # any numeric Garmin product id
 ```
 
 Converted files are written next to the originals with a `_garmin` suffix.
 When you pass a folder, files that already end in `_garmin.fit` are skipped.
 Upload the converted files to Garmin Connect (web: **Import Data**).
+
+```
+🔄 Converting 3 files to Garmin edge830 (product 3122)...
+
+❌ broken.fit: not a FIT file
+✅ ride1.fit → ride1_garmin.fit
+✅ ride2.fit → ride2_garmin.fit
+
+======================================================================
+Conversion Summary
+----------------------------------------------------------------------
+3 files, 2 converted, 1 failed
+======================================================================
+
+Total runtime: 0.01s
+
+❌ 1 out of 3 files failed to convert
+```
+
+The exit code is 0 when every file converted and 1 otherwise.
+
+### Options
+
+| Option | Environment variable | Description |
+|--------|----------------------|-------------|
+| `-p`, `--product` | `MOWL_TO_GARMIN_PRODUCT` | Device preset name or numeric product id (default `edge830`) |
+| `--version` | | Print the version and exit |
+| `--help` | | Show the help and exit |
+
+Set `NO_COLOR=1` to turn off colored output.
 
 You can also run it as a module: `python -m mowl_to_garmin ...`.
 

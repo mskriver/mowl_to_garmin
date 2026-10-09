@@ -7,7 +7,7 @@ license = "MIT"
 license-files = ["LICENSE"]
 authors = [{ name = "Morten Skriver" }]
 requires-python = ">=3.10"
-dependencies = []
+dependencies = ["typer>=0.17"]
 keywords = ["fit", "garmin", "garmin-connect", "cycling", "training-effect"]
 classifiers = [
     "Development Status :: 3 - Alpha",
@@ -20,7 +20,7 @@ classifiers = [
 ]
 
 [project.scripts]
-mowl-to-garmin = "mowl_to_garmin.cli:main"
+mowl-to-garmin = "mowl_to_garmin.cli:app"
 
 [build-system]
 requires = ["hatchling>=1.27"]
