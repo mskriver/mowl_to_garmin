@@ -21,10 +21,10 @@ to install it:
 uv tool install .
 
 # or straight from git
-uv tool install git+https://github.com/<you>/mowl-to-garmin
+uv tool install git+https://github.com/mskriver/mowl-to-garmin
 
 # or run it once without installing
-uvx --from git+https://github.com/<you>/mowl-to-garmin mowl-to-garmin ride.fit
+uvx --from git+https://github.com/mskriver/mowl-to-garmin mowl-to-garmin ride.fit
 ```
 
 ## Usage
