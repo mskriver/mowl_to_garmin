@@ -103,6 +103,25 @@ uv run ruff check .     # lint
 uv build                # build sdist + wheel into dist/
 ```
 
+## Contributing
+
+Bug reports and ideas are welcome on the
+[issue tracker](https://github.com/mskriver/mowl-to-garmin/issues).
+
+For a bug, please include:
+
+- the output of `mowl-to-garmin --version` and your Python version,
+- the app or device that recorded the file,
+- the full output of the failing command,
+- what Garmin Connect did with the converted file, if it got that far.
+
+A sample `.fit` file helps a lot, but note that these files contain GPS tracks
+and health data. Only attach one you are comfortable making public.
+
+Pull requests are welcome too. Please run `uv run pytest` and
+`uv run ruff check .` first, and add a test for any change to the conversion
+logic.
+
 ## Disclaimer
 
 This project is not affiliated with or endorsed by Garmin. "Garmin", "Edge" and
