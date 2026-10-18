@@ -1,9 +1,13 @@
+import re
+
 import pytest
 from typer.testing import CliRunner
 
 from mowl_to_garmin import __version__
 from mowl_to_garmin.cli import app
 from mowl_to_garmin.fit import convert
+
+ANSI_ESCAPE = re.compile(r"\x1b\[[0-9;]*m")
 
 
 @pytest.fixture
@@ -72,8 +76,9 @@ def test_version(run):
 def test_help_lists_options(run):
     result = run("--help")
     assert result.exit_code == 0
+    output = ANSI_ESCAPE.sub("", result.output)
     for text in ("--product", "-p", "--version", "MOWL_TO_GARMIN_PRODUCT", "edge830"):
-        assert text in result.output
+        assert text in output
 
 
 def test_original_file_is_left_untouched(run, ride, fit_bytes):
