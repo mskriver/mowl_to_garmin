@@ -16,15 +16,23 @@ The tool needs Python 3.10 or newer. [uv](https://docs.astral.sh/uv/) is the
 recommended way to install it:
 
 ```sh
-# from a local checkout
+# install a specific release (v0.1.0)
+uv tool install git+https://github.com/mskriver/mowl_to_garmin@v0.1.0
+
+# or the latest development version (HEAD of main), which may be unreleased
+uv tool install git+https://github.com/mskriver/mowl_to_garmin@main
+
+# or from a local checkout
 uv tool install .
 
-# or straight from git
-uv tool install git+https://github.com/mskriver/mowl-to-garmin
-
 # or run it once without installing
-uvx --from git+https://github.com/mskriver/mowl-to-garmin mowl-to-garmin ride.fit
+uvx --from git+https://github.com/mskriver/mowl_to_garmin@v0.1.0 mowl-to-garmin ride.fit
 ```
+
+Check the installation with `mowl-to-garmin --version`. To switch to another
+release, or to pick up new commits on `main`, rerun the install command with
+`--force`.
+To remove the tool, run `uv tool uninstall mowl-to-garmin`.
 
 ## Usage
 
