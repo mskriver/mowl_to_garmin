@@ -29,10 +29,29 @@ uv tool install .
 uvx --from git+https://github.com/mskriver/mowl_to_garmin@v0.1.0 mowl-to-garmin ride.fit
 ```
 
-Check the installation with `mowl-to-garmin --version`. To switch to another
-release, or to pick up new commits on `main`, rerun the install command with
-`--force`.
-To remove the tool, run `uv tool uninstall mowl-to-garmin`.
+Check the installation with `mowl-to-garmin --version`.
+
+### Upgrading
+
+Rerun the install command with `--force` and the release you want, or with
+`@main` to pick up new commits:
+
+```sh
+# move to a newer release, for example v0.2.0
+uv tool install --force git+https://github.com/mskriver/mowl_to_garmin@v0.2.0
+
+# or update to the latest main
+uv tool install --force git+https://github.com/mskriver/mowl_to_garmin@main
+```
+
+An install pinned to a tag stays on that tag, so `uv tool upgrade` will not move
+it to a newer release.
+
+### Uninstalling
+
+```sh
+uv tool uninstall mowl-to-garmin
+```
 
 ## Usage
 
