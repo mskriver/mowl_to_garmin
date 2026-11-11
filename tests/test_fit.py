@@ -173,3 +173,27 @@ def test_added_fields_go_before_developer_fields():
     assert_crcs_valid(out)
     # data message: type, manufacturer, product, then the developer bytes
     assert out[-2 - 7:-2] == struct.pack("<BHH", 4, GARMIN, 3122) + b"\xab\xcd"
+
+
+def test_iter_messages_decodes_fields_and_compressed_timestamps():
+    from mowl_to_garmin.fit import iter_messages
+
+    ts = 1_000_000  # ts % 32 == 0
+    records = definition(0, 0, [(0, 1, UINT8), (4, 4, 0x86)])
+    records += data(0, struct.pack("<BI", 4, ts))
+    records += definition(1, 20, [(253, 4, 0x86), (3, 1, UINT8)])
+    records += data(1, struct.pack("<IB", ts + 30, 130))
+    records += definition(2, 20, [(3, 1, UINT8)])
+    records += bytes([0x80 | (2 << 5) | 31, 140])   # compressed, offset 31 -> ts + 31
+    records += bytes([0x80 | (2 << 5) | 2, 141])    # offset rolls over -> ts + 34
+    msgs = list(iter_messages(build_fit(records)))
+    assert next(v for g, v in msgs if g == 0) == {0: 4, 4: ts}
+    hrs = [(v[253], v[3]) for g, v in msgs if g == 20]
+    assert hrs == [(ts + 30, 130), (ts + 31, 140), (ts + 34, 141)]
+
+
+def test_iter_messages_rejects_non_fit():
+    from mowl_to_garmin.fit import iter_messages
+
+    with pytest.raises(ValueError, match="not a FIT file"):
+        list(iter_messages(b"\x0e" + b"\x00" * 20))

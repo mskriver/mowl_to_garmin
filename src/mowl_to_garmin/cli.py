@@ -9,6 +9,7 @@ import typer
 
 from . import __version__, ui
 from .fit import PRODUCTS, convert
+from .vo2 import Estimate, estimate_vo2max, max_hr_from_age
 
 DEFAULT_PRODUCT_NAME = "edge830"
 
@@ -93,10 +94,90 @@ Version = Annotated[
 ]
 
 
+Vo2 = Annotated[
+    bool,
+    typer.Option(
+        "--vo2",
+        help="Experimental: print a VO2 Max estimate from power and heart rate. "
+        "Needs --weight and --max-hr (or --age). The output file is not changed.",
+    ),
+]
+
+Weight = Annotated[
+    float | None,
+    typer.Option(
+        "--weight",
+        help="Body weight in kg, for --vo2.",
+        envvar="MOWL_TO_GARMIN_WEIGHT",
+        metavar="KG",
+        min=20,
+        max=300,
+        show_default=False,
+    ),
+]
+
+MaxHr = Annotated[
+    int | None,
+    typer.Option(
+        "--max-hr",
+        help="Max heart rate in bpm, for --vo2. Find it under heart rate zones "
+        "in Garmin Connect or on your watch.",
+        envvar="MOWL_TO_GARMIN_MAX_HR",
+        metavar="BPM",
+        min=100,
+        max=240,
+        show_default=False,
+    ),
+]
+
+Age = Annotated[
+    int | None,
+    typer.Option(
+        "--age",
+        help="Age in years, used for --vo2 to estimate max heart rate when "
+        "--max-hr is not given (less accurate).",
+        envvar="MOWL_TO_GARMIN_AGE",
+        metavar="YEARS",
+        min=10,
+        max=110,
+        show_default=False,
+    ),
+]
+
+
+def resolve_vo2_inputs(weight, max_hr, age):
+    """Return (max_hr, missing, note) for --vo2."""
+    note = None
+    if max_hr is None and age is not None:
+        max_hr = max_hr_from_age(age)
+        note = (f"ℹ️  Max heart rate estimated from age as {max_hr} bpm; "
+                "pass --max-hr for a more accurate VO2 Max")
+    missing = []
+    if weight is None:
+        missing.append("weight")
+    if max_hr is None:
+        missing.append("max heart rate")
+    return max_hr, missing, note
+
+
+def vo2_suffix(raw, weight, max_hr):
+    try:
+        result = estimate_vo2max(raw, weight, max_hr)
+    except Exception as e:  # never let the estimate break a conversion
+        return f" · VO2 Max: not estimated ({e})"
+    if isinstance(result, Estimate):
+        return f" · VO2 Max est. {result.vo2max:.1f} (R² {result.r2:.2f}, {result.blocks} blocks)"
+    return f" · VO2 Max: not enough data ({result.reason})"
+
+
 @app.command()
 def main(
     paths: Paths,
     product: Product = DEFAULT_PRODUCT_NAME,
+    vo2: Vo2 = False,
+    weight: Weight = None,
+    max_hr: MaxHr = None,
+    age: Age = None,
     version: Version = False,
 ) -> None:
     """Make .fit files look like they were recorded on a Garmin device, so
@@ -118,13 +199,26 @@ def main(
     noun = "file" if len(files) == 1 else "files"
     typer.echo(f"\n🔄 Converting {len(files)} {noun} to {product_label(product_id)}...\n")
 
+    if vo2:
+        max_hr, missing, note = resolve_vo2_inputs(weight, max_hr, age)
+        if missing:
+            typer.echo(ui.warning(
+                "⚠️  --vo2 needs --weight and --max-hr or --age "
+                f"(missing: {', '.join(missing)}); skipping VO2 Max estimate\n"
+            ), err=True)
+            vo2 = False
+        elif note:
+            typer.echo(note + "\n")
+
     ok = 0
     for f in files:
         try:
-            new = convert(f.read_bytes(), product_id)
+            raw = f.read_bytes()
+            new = convert(raw, product_id)
             dest = f.with_name(f.stem + "_garmin.fit")
             dest.write_bytes(new)
-            typer.echo(f"✅ {f.name} → {dest.name}")
+            suffix = vo2_suffix(raw, weight, max_hr) if vo2 else ""
+            typer.echo(f"✅ {f.name} → {dest.name}{suffix}")
             ok += 1
         except Exception as e:
             typer.echo(f"❌ {f.name}: {ui.error(str(e))}")

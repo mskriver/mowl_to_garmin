@@ -92,6 +92,10 @@ The exit code is 0 when every file converted and 1 otherwise.
 | Option | Environment variable | Description |
 |--------|----------------------|-------------|
 | `-p`, `--product` | `MOWL_TO_GARMIN_PRODUCT` | Device preset name or numeric product id (default `edge830`) |
+| `--vo2` | | **Experimental.** Print a VO2 Max estimate per ride (off by default, see below) |
+| `--weight` | `MOWL_TO_GARMIN_WEIGHT` | Body weight in kg, needed for `--vo2` |
+| `--max-hr` | `MOWL_TO_GARMIN_MAX_HR` | Max heart rate in bpm, needed for `--vo2` |
+| `--age` | `MOWL_TO_GARMIN_AGE` | Age, used to estimate max heart rate when `--max-hr` is not given |
 | `--version` | | Print the version and exit |
 | `--help` | | Show the help and exit |
 
@@ -108,6 +112,53 @@ You can also run it as a module: `python -m mowl_to_garmin ...`.
 | `edge1030` | 2713 |
 
 Any other product id from the FIT SDK can be passed as a number.
+
+### VO2 Max estimate (experimental)
+
+> [!WARNING]
+> `--vo2` is an **experimental** feature. The estimate has not yet been
+> validated against Garmin's own VO2 Max values. The method, its thresholds and
+> the output format may change in any release, and the option may be removed.
+> Use it to follow your own trend, not as a measurement.
+
+```sh
+mowl-to-garmin ride.fit --vo2 --weight 80 --max-hr 182
+# ✅ ride.fit → ride_garmin.fit · VO2 Max est. 56.8 (R² 0.78, 18 blocks)
+```
+
+With `--vo2` the tool prints an estimate of your cycling VO2 Max (ml/kg/min)
+for each ride. The converted file is **not** changed, and Garmin Connect will
+not show this value. It is meant for watching your own trend across sessions.
+
+How it works: the tool fits heart rate against power over the steady parts of
+the first 12 minutes of the ride, extrapolates to your max heart rate, and
+converts that power to oxygen uptake with the ACSM cycling equation
+(`10.8 × watts / kg + 7`). The ride needs power and heart rate. If the data
+is too short, too uneven or too easy, the tool prints `not enough data` and
+the reason instead of a number.
+
+**Finding your max heart rate:** use the value under heart rate zones in your
+Garmin Connect user settings, or the user profile on your watch. Many watches
+update it automatically from hard efforts. If you don't know it, pass `--age`
+instead: the tool then uses `208 − 0.7 × age`, which can be off by about 10 bpm
+and moves the estimate by about 5 ml/kg/min. If `--weight` or a max heart rate
+is missing, `--vo2` prints a warning and only converts the files.
+
+Set the values once with the environment variables listed above, so you don't
+have to repeat them.
+
+## Limitations
+
+Some Garmin Connect metrics can't be produced by changing a file:
+
+- **VO2 Max** is calculated on the Garmin device and stored in the files it
+  records. Garmin Connect doesn't calculate it for uploaded files, and most
+  devices don't produce one for indoor rides anyway. Converted rides therefore
+  don't update your VO2 Max chart.
+- **Intensity Minutes, Vigorous Minutes and Vigorous Days** (used for Fitness
+  Age) come from the all-day heart rate tracking of a Garmin watch, not from
+  uploaded activities. Wear your Garmin watch during the session and it counts
+  these minutes itself, without starting an activity on it.
 
 ## How it works
 

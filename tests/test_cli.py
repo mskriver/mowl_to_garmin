@@ -12,7 +12,8 @@ ANSI_ESCAPE = re.compile(r"\x1b\[[0-9;]*m")
 
 @pytest.fixture
 def run(monkeypatch):
-    monkeypatch.delenv("MOWL_TO_GARMIN_PRODUCT", raising=False)
+    for var in ("PRODUCT", "WEIGHT", "MAX_HR", "AGE"):
+        monkeypatch.delenv(f"MOWL_TO_GARMIN_{var}", raising=False)
     monkeypatch.setenv("NO_COLOR", "1")
     monkeypatch.setenv("COLUMNS", "200")
     runner = CliRunner()
@@ -77,7 +78,8 @@ def test_help_lists_options(run):
     result = run("--help")
     assert result.exit_code == 0
     output = ANSI_ESCAPE.sub("", result.output)
-    for text in ("--product", "-p", "--version", "MOWL_TO_GARMIN_PRODUCT", "edge830"):
+    for text in ("--product", "-p", "--version", "MOWL_TO_GARMIN_PRODUCT", "edge830",
+                 "--vo2", "--weight", "--max-hr", "--age", "MOWL_TO_GARMIN_MAX_HR"):
         assert text in output
 
 
@@ -162,3 +164,68 @@ def test_multiple_paths(run, tmp_path, fit_bytes):
 
 def test_no_arguments_is_usage_error(run):
     assert run().exit_code == 2
+
+
+@pytest.fixture
+def power_ride(tmp_path, ride_bytes):
+    src = tmp_path / "ride.fit"
+    src.write_bytes(ride_bytes)
+    return src
+
+
+def test_vo2_estimate_is_printed(run, power_ride, ride_bytes):
+    result = run(power_ride, "--vo2", "--weight", "75", "--max-hr", "180")
+    assert result.exit_code == 0
+    assert "✅ ride.fit → ride_garmin.fit · VO2 Max est. 50.2 (R² 1.00," in result.output
+    # the output file is the same as without --vo2
+    assert power_ride.with_name("ride_garmin.fit").read_bytes() == convert(ride_bytes, 3122)
+
+
+def test_vo2_is_off_by_default(run, power_ride):
+    result = run(power_ride, "--weight", "75", "--max-hr", "180")
+    assert "VO2" not in result.output
+
+
+@pytest.mark.parametrize(
+    "args, missing",
+    [
+        ((), "weight, max heart rate"),
+        (("--max-hr", "180"), "weight"),
+        (("--weight", "75"), "max heart rate"),
+    ],
+)
+def test_vo2_missing_inputs_warns_but_converts(run, power_ride, args, missing):
+    result = run(power_ride, "--vo2", *args)
+    assert result.exit_code == 0
+    assert f"⚠️  --vo2 needs --weight and --max-hr or --age (missing: {missing})" in result.output
+    assert "✅ ride.fit → ride_garmin.fit\n" in result.output
+    assert "VO2 Max est." not in result.output
+
+
+def test_vo2_age_fallback(run, power_ride):
+    result = run(power_ride, "--vo2", "--weight", "75", "--age", "40")
+    assert result.exit_code == 0
+    assert "Max heart rate estimated from age as 180 bpm" in result.output
+    assert "VO2 Max est. 50.2" in result.output
+
+
+def test_vo2_max_hr_overrides_age(run, power_ride):
+    result = run(power_ride, "--vo2", "--weight", "75", "--max-hr", "180", "--age", "70")
+    assert "estimated from age" not in result.output
+    assert "VO2 Max est. 50.2" in result.output
+
+
+def test_vo2_inputs_from_environment(run, power_ride):
+    env = {"MOWL_TO_GARMIN_WEIGHT": "75", "MOWL_TO_GARMIN_MAX_HR": "180"}
+    result = run(power_ride, "--vo2", env=env)
+    assert "VO2 Max est. 50.2" in result.output
+
+
+def test_vo2_not_enough_data(run, ride):
+    result = run(ride, "--vo2", "--weight", "75", "--max-hr", "180")
+    assert result.exit_code == 0
+    assert "· VO2 Max: not enough data (no power data)" in result.output
+
+
+def test_vo2_out_of_range_input_is_usage_error(run, power_ride):
+    assert run(power_ride, "--vo2", "--weight", "5", "--max-hr", "180").exit_code == 2

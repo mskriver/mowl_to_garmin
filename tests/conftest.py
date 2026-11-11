@@ -45,3 +45,28 @@ def sample_records(with_device_fields=True):
 @pytest.fixture
 def fit_bytes():
     return build_fit(sample_records())
+
+
+INVALID_HR = 0xFF
+INVALID_POWER = 0xFFFF
+
+
+def ride_records(seconds=20 * 60, power=None, hr=None, start_ts=1_000_000):
+    """file_id + 1 Hz records with timestamp, heart rate and power.
+
+    Default ride: power steps up 10 W every minute from 100 W, and heart rate
+    follows exactly HR = 60 + 0.4 * power, 45 s later.
+    """
+    power = power or (lambda t: 100 + 10 * (t // 60))
+    hr = hr or (lambda t: round(60 + 0.4 * power(max(t - 45, 0))))
+    out = definition(0, 0, [(0, 1, UINT8), (1, 2, UINT16), (2, 2, UINT16)])
+    out += data(0, struct.pack("<BHH", 4, 255, 1))
+    out += definition(1, 20, [(253, 4, UINT32), (3, 1, UINT8), (7, 2, UINT16)])
+    for t in range(seconds):
+        out += data(1, struct.pack("<IBH", start_ts + t, hr(t), power(t)))
+    return out
+
+
+@pytest.fixture
+def ride_bytes():
+    return build_fit(ride_records())

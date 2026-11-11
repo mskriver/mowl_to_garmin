@@ -159,3 +159,71 @@ def convert(raw: bytes, product: int):
         struct.pack_into("<H", header, 12, fit_crc(header[:12]))
     result = bytes(header) + bytes(out)
     return result + struct.pack("<H", fit_crc(result))
+
+
+_INT_FORMATS = {1: "B", 2: "H", 4: "I", 8: "Q"}
+_SIGNED_BASE_TYPES = {0x01, 0x83, 0x85, 0x8E}  # sint8/16/32/64
+
+
+def iter_messages(raw: bytes):
+    """Decode a FIT file read-only: yield (global_num, {field_num: int}).
+
+    Only integer fields of size 1, 2, 4 or 8 are decoded; other fields (strings,
+    arrays) and developer fields are skipped. Compressed-timestamp records get
+    their full timestamp in field 253.
+    """
+    hdr_size = raw[0]
+    if raw[8:12] != b".FIT":
+        raise ValueError("not a FIT file")
+    data_size = struct.unpack_from("<I", raw, 4)[0]
+    body = raw[hdr_size:hdr_size + data_size]
+
+    defs = {}
+    last_ts = None
+    pos = 0
+    while pos < len(body):
+        rh = body[pos]
+        pos += 1
+        compressed_offset = None
+        if rh & 0x80:
+            local = (rh >> 5) & 0x03
+            compressed_offset = rh & 0x1F
+        elif rh & 0x40:
+            local = rh & 0x0F
+            big = body[pos + 1] == 1
+            gnum = struct.unpack_from(">H" if big else "<H", body, pos + 2)[0]
+            nf = body[pos + 4]
+            pos += 5
+            fields = [tuple(body[pos + 3 * i:pos + 3 * i + 3]) for i in range(nf)]
+            pos += 3 * nf
+            dev_size = 0
+            if rh & 0x20:
+                ndev = body[pos]
+                dev_size = sum(body[pos + 2 + 3 * i] for i in range(ndev))
+                pos += 1 + 3 * ndev
+            defs[local] = (gnum, ">" if big else "<", fields, dev_size)
+            continue
+        else:
+            local = rh & 0x0F
+
+        if local not in defs:
+            raise ValueError(f"data message for undefined local type {local}")
+        gnum, endian, fields, dev_size = defs[local]
+        values = {}
+        for num, size, base_type in fields:
+            code = _INT_FORMATS.get(size)
+            if code is not None and base_type != 0x07:  # 0x07 = string
+                if base_type in _SIGNED_BASE_TYPES:
+                    code = code.lower()
+                values[num] = struct.unpack_from(endian + code, body, pos)[0]
+            pos += size
+        pos += dev_size
+
+        if compressed_offset is not None and last_ts is not None:
+            ts = (last_ts & ~0x1F) + compressed_offset
+            if compressed_offset < (last_ts & 0x1F):
+                ts += 0x20
+            values[253] = ts
+        if 253 in values:
+            last_ts = values[253]
+        yield gnum, values
